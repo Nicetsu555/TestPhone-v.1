@@ -3367,7 +3367,7 @@ function rtPopup(state, html = '') {
     el.dataset.s = state;
     el.querySelector('.ps-rt-ic').innerHTML =
         state === 'scan' ? '<span class="ps-scan-spin"></span>' : `<i class="fa-solid ${state === 'done' ? 'fa-check' : 'fa-circle-info'}"></i>`;
-    el.querySelector('.ps-rt-tx').innerHTML = state === 'scan' ? '<b>กำลังตรวจจับข้อมูลเรียลไทม์</b><span>NEONBANK กำลังติดตามความเคลื่อนไหวในเนื้อเรื่อง...</span>' : html;
+    el.querySelector('.ps-rt-tx').innerHTML = state === 'scan' ? '<b>กำลังตรวจจับข้อมูลเรียลไทม์</b><span>กำลังติดตามความเคลื่อนไหวในเนื้อเรื่อง...</span>' : html;
     if (state !== 'scan') rtHideTimer = setTimeout(() => rtPopup('hide'), state === 'done' ? 5200 : 1600);
 }
 function sprinkleRt(card) {
