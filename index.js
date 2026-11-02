@@ -2821,6 +2821,151 @@ function buildFab() {
     btn.addEventListener('pointercancel', () => (drag = null));
 }
 
+/* ---------- แอป: Wavy (ฟีดข่าวสไตล์โซเชียล) ----------
+   วางต่อท้ายบล็อก registerApp อื่น ๆ ใน index.js (หลังฟังก์ชัน registerApp / save / esc / notify)
+   กติกา: เรียกโมเดล "ครั้งเดียวตอนเปิดแอปเท่านั้น" ไม่มีรีเฟรช ไม่เรียกซ้ำตอนกดไลก์/เลื่อน */
+
+const WAVY_SYSTEM =
+    'You write a fake social-media news feed for a roleplay. Reply with a JSON array only, no explanation. ' +
+    'Each item: {"name":"","text":"","time":"","likes":0,"comments":0}. Write in Thai, casual, like real posts. ' +
+    'Authors must be people from the story context or believable locals. Never use real brands as the app name.';
+
+function wavyStore() {
+    const s = getSettings();
+    if (!s.wavy) s.wavy = { posts: [], intro: false };
+    return s.wavy;
+}
+
+function wavyContext() {
+    const ctx = getContext();
+    const names = (getSettings().contacts?.list || []).map((c) => c.name).filter(Boolean).slice(0, 12);
+    const tail = (ctx.chat || [])
+        .slice(-6)
+        .map((m) => `${m.name}: ${String(m.mes || '').slice(0, 300)}`)
+        .join('\n');
+    return `User: ${ctx.name1 || 'user'}\nKnown people: ${names.join(', ') || '-'}\n\nRecent story:\n${tail || '-'}`;
+}
+
+async function wavyAsk(prompt) {
+    const ctx = getContext();
+    let gen = ctx.generateRaw;
+    if (typeof gen !== 'function') gen = (await import('../../../../script.js')).generateRaw;
+    if (typeof gen !== 'function') throw new Error('ไม่พบฟังก์ชันเรียกโมเดล');
+    let out;
+    try {
+        out = await gen({ prompt, systemPrompt: WAVY_SYSTEM, responseLength: 1200 });
+    } catch {
+        out = await gen(prompt, null, false, false, WAVY_SYSTEM, 1200);
+    }
+    return String(out ?? '');
+}
+
+function wavyParse(text) {
+    const t = String(text).replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/```(?:json)?/gi, '');
+    const a = t.indexOf('[');
+    const b = t.lastIndexOf(']');
+    if (a < 0 || b <= a) throw new Error('โมเดลไม่ได้ตอบเป็น JSON');
+    return JSON.parse(t.slice(a, b + 1))
+        .filter((p) => p && p.name && p.text)
+        .slice(0, 8)
+        .map((p, i) => ({
+            id: Date.now() + i,
+            name: String(p.name).slice(0, 40),
+            text: String(p.text).slice(0, 400),
+            time: String(p.time || 'เมื่อสักครู่').slice(0, 20),
+            likes: Math.max(0, +p.likes || 0),
+            comments: Math.max(0, +p.comments || 0),
+            liked: false,
+        }));
+}
+
+// ภาพพรีเซตแนะนำแอป (SVG ในตัว ไม่ต้องโหลดรูปจากภายนอก)
+const WAVY_INTRO_SVG = `<svg viewBox="0 0 320 170" xmlns="http://www.w3.org/2000/svg">
+<defs><linearGradient id="wvg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14b8a6"/><stop offset="1" stop-color="#a3e635"/></linearGradient></defs>
+<rect width="320" height="170" rx="18" fill="url(#wvg)"/>
+<circle cx="268" cy="30" r="46" fill="#fff" opacity=".12"/><circle cx="40" cy="150" r="54" fill="#fff" opacity=".1"/>
+<rect x="30" y="22" width="150" height="40" rx="10" fill="#fff"/><circle cx="48" cy="42" r="10" fill="#14b8a6"/>
+<rect x="64" y="34" width="70" height="6" rx="3" fill="#cbd5d1"/><rect x="64" y="46" width="100" height="6" rx="3" fill="#e3ece9"/>
+<rect x="60" y="74" width="170" height="40" rx="10" fill="#fff"/><circle cx="78" cy="94" r="10" fill="#f59e0b"/>
+<rect x="94" y="86" width="80" height="6" rx="3" fill="#cbd5d1"/><rect x="94" y="98" width="110" height="6" rx="3" fill="#e3ece9"/>
+<rect x="90" y="126" width="150" height="30" rx="10" fill="#fff"/><circle cx="106" cy="141" r="8" fill="#8b5cf6"/>
+<rect x="122" y="136" width="90" height="6" rx="3" fill="#cbd5d1"/>
+<path d="M262 96c0-9 11-12 14-4 3-8 14-5 14 4 0 9-14 18-14 18s-14-9-14-18z" fill="#fff"/></svg>`;
+
+registerApp({
+    id: 'wavy',
+    label: 'Wavy',
+    iconHtml: '<i class="fa-solid fa-wave-square"></i>',
+    iconClass: 'ps-ico-wavy',
+    fontClass: 'ps-wavy',
+    render(app, ctx) {
+        const st = wavyStore();
+        if (st.intro) return this.load(app);
+        app.innerHTML = `
+            <div class="wv-intro">
+                <div class="wv-intro-img">${WAVY_INTRO_SVG}</div>
+                <h2>ยินดีต้อนรับสู่ Wavy</h2>
+                <ul>
+                    <li><i class="fa-solid fa-newspaper"></i> ฟีดข่าวใหม่ตามเนื้อเรื่อง สร้างทุกครั้งที่เปิดแอป</li>
+                    <li><i class="fa-solid fa-heart"></i> กดถูกใจโพสต์ได้</li>
+                    <li><i class="fa-solid fa-bolt"></i> เรียกโมเดลแค่ตอนเปิดแอป ไม่กินโควต้าตอนเลื่อนดู</li>
+                </ul>
+                <button class="wv-start">เริ่มใช้งาน</button>
+            </div>`;
+        app.querySelector('.wv-start').onclick = () => {
+            st.intro = true;
+            save();
+            this.load(app);
+        };
+    },
+    async load(app) {
+        const st = wavyStore();
+        const tok = (app._wvTok = Date.now());
+        const draw = (posts, note) => {
+            if (app._wvTok !== tok || !app.isConnected) return;
+            app.innerHTML = `
+                <div class="wv-head"><span class="wv-logo">wavy</span><i class="fa-solid fa-wave-square"></i></div>
+                ${note ? `<div class="wv-note">${esc(note)}</div>` : ''}
+                <div class="wv-feed">
+                    ${posts.map((p) => `
+                        <article class="wv-post" data-id="${p.id}">
+                            <div class="wv-who">
+                                <span class="wv-av" style="--h:${[...p.name].reduce((a, c) => a + c.charCodeAt(0), 0) % 360}">${esc([...p.name][0])}</span>
+                                <div><b>${esc(p.name)}</b><small>${esc(p.time)}</small></div>
+                            </div>
+                            <p>${esc(p.text)}</p>
+                            <div class="wv-stat"><span class="wv-lc">${p.likes + (p.liked ? 1 : 0)} ถูกใจ</span><span>${p.comments} ความคิดเห็น</span></div>
+                            <div class="wv-act">
+                                <button class="wv-like ${p.liked ? 'on' : ''}"><i class="fa-solid fa-heart"></i> ถูกใจ</button>
+                                <button class="wv-na"><i class="fa-regular fa-comment"></i> ความคิดเห็น</button>
+                                <button class="wv-na"><i class="fa-solid fa-share"></i> แชร์</button>
+                            </div>
+                        </article>`).join('') || '<div class="wv-note">ยังไม่มีโพสต์</div>'}
+                </div>`;
+            app.querySelectorAll('.wv-post').forEach((el) => {
+                const p = posts.find((x) => String(x.id) === el.dataset.id);
+                el.querySelector('.wv-like').onclick = (e) => {
+                    p.liked = !p.liked; // เก็บในเครื่องเท่านั้น ไม่เรียกโมเดล
+                    e.currentTarget.classList.toggle('on', p.liked);
+                    el.querySelector('.wv-lc').textContent = `${p.likes + (p.liked ? 1 : 0)} ถูกใจ`;
+                    save();
+                };
+                el.querySelectorAll('.wv-na').forEach((b) => (b.onclick = () => notify('info', 'ยังไม่เปิดให้ใช้งาน')));
+            });
+        };
+        app.innerHTML = `<div class="wv-head"><span class="wv-logo">wavy</span></div>
+            <div class="wv-feed">${'<div class="wv-post wv-skel"></div>'.repeat(3)}</div>`;
+        try {
+            const raw = await wavyAsk(`Write 6 new posts for the feed.\n\n${wavyContext()}`);
+            st.posts = wavyParse(raw);
+            save();
+            draw(st.posts);
+        } catch (e) {
+            draw(st.posts, st.posts.length ? 'โหลดฟีดใหม่ไม่สำเร็จ แสดงโพสต์ล่าสุดแทน' : `โหลดฟีดไม่สำเร็จ: ${e.message}`);
+        }
+    },
+});
+
 jQuery(() => {
     try {
         getSettings();
