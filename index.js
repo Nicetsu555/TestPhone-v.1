@@ -2966,6 +2966,244 @@ registerApp({
     },
 });
 
+/* ---------- แอป: Wavy (ฟีดข่าวสไตล์โซเชียล) v2 ----------
+   วางเหนือบล็อก jQuery(() => { ท้าย index.js (ถ้าเคยวาง Wavy รุ่นแรกไว้ ให้ลบอันเก่าออกก่อน)
+   - เปิดแอปแล้วขึ้นหน้า "ไม่มีการเชื่อมต่อ" ไม่เรียกโมเดลเอง
+   - เรียกโมเดลเฉพาะตอนกดปุ่มรีโหลด
+   - ปุ่มตั้งค่าขวาบน: ใส่ API แยก (รูปแบบ OpenAI-compatible) ถ้าเว้นว่างจะใช้ API หลักของ SillyTavern */
+
+const WAVY_SYSTEM =
+    'You write a fake social-media news feed for a roleplay. Reply with a JSON array only, no explanation. ' +
+    'Each item: {"name":"","text":"","time":"","likes":0,"comments":0}. Write in Thai, casual, like real posts. ' +
+    'Authors must be people from the story context or believable locals. Never use real brands as the app name.';
+
+function wavyStore() {
+    const s = getSettings();
+    if (!s.wavy) s.wavy = {};
+    s.wavy.intro ??= false;
+    s.wavy.api ??= { url: 'https://api.openai.com/v1', key: '', model: '' };
+    return s.wavy;
+}
+
+function wavyContext() {
+    const ctx = getContext();
+    const names = (getSettings().contacts?.list || []).map((c) => c.name).filter(Boolean).slice(0, 12);
+    const tail = (ctx.chat || [])
+        .slice(-6)
+        .map((m) => `${m.name}: ${String(m.mes || '').slice(0, 300)}`)
+        .join('\n');
+    return `User: ${ctx.name1 || 'user'}\nKnown people: ${names.join(', ') || '-'}\n\nRecent story:\n${tail || '-'}`;
+}
+
+// API แยก (OpenAI-compatible) — ใช้เมื่อใส่ key เท่านั้น
+async function wavyAskCustom(api, prompt) {
+    if (!api.model) throw new Error('ยังไม่ได้ใส่ชื่อโมเดลในตั้งค่า');
+    const r = await fetch(`${api.url.replace(/\/+$/, '')}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${api.key}` },
+        body: JSON.stringify({
+            model: api.model,
+            messages: [{ role: 'system', content: WAVY_SYSTEM }, { role: 'user', content: prompt }],
+            max_tokens: 1200,
+            temperature: 0.9,
+        }),
+    });
+    if (!r.ok) throw new Error(`API แยกตอบกลับ ${r.status}`);
+    const j = await r.json();
+    return String(j.choices?.[0]?.message?.content ?? '');
+}
+
+// API หลักของ SillyTavern
+async function wavyAskMain(prompt) {
+    const ctx = getContext();
+    let gen = ctx.generateRaw;
+    if (typeof gen !== 'function') gen = (await import('../../../../script.js')).generateRaw;
+    if (typeof gen !== 'function') throw new Error('ไม่พบฟังก์ชันเรียกโมเดล');
+    let out;
+    try {
+        out = await gen({ prompt, systemPrompt: WAVY_SYSTEM, responseLength: 1200 });
+    } catch {
+        out = await gen(prompt, null, false, false, WAVY_SYSTEM, 1200);
+    }
+    return String(out ?? '');
+}
+
+function wavyAsk(prompt) {
+    const api = wavyStore().api;
+    return api.key.trim() ? wavyAskCustom(api, prompt) : wavyAskMain(prompt);
+}
+
+function wavyParse(text) {
+    const t = String(text).replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/```(?:json)?/gi, '');
+    const a = t.indexOf('[');
+    const b = t.lastIndexOf(']');
+    if (a < 0 || b <= a) throw new Error('โมเดลไม่ได้ตอบเป็น JSON');
+    return JSON.parse(t.slice(a, b + 1))
+        .filter((p) => p && p.name && p.text)
+        .slice(0, 8)
+        .map((p, i) => ({
+            id: Date.now() + i,
+            name: String(p.name).slice(0, 40),
+            text: String(p.text).slice(0, 400),
+            time: String(p.time || 'เมื่อสักครู่').slice(0, 20),
+            likes: Math.max(0, +p.likes || 0),
+            comments: Math.max(0, +p.comments || 0),
+            liked: false,
+        }));
+}
+
+// ภาพพรีเซตแนะนำแอป (SVG ในตัว)
+const WAVY_INTRO_SVG = `<svg viewBox="0 0 320 170" xmlns="http://www.w3.org/2000/svg">
+<defs><linearGradient id="wvg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b82f6"/><stop offset="1" stop-color="#5eead4"/></linearGradient></defs>
+<rect width="320" height="170" rx="18" fill="url(#wvg)"/>
+<circle cx="268" cy="30" r="46" fill="#fff" opacity=".12"/><circle cx="40" cy="150" r="54" fill="#fff" opacity=".1"/>
+<rect x="30" y="22" width="150" height="40" rx="10" fill="#fff"/><circle cx="48" cy="42" r="10" fill="#3b82f6"/>
+<rect x="64" y="34" width="70" height="6" rx="3" fill="#c9d8e6"/><rect x="64" y="46" width="100" height="6" rx="3" fill="#e3edf5"/>
+<rect x="60" y="74" width="170" height="40" rx="10" fill="#fff"/><circle cx="78" cy="94" r="10" fill="#2dd4bf"/>
+<rect x="94" y="86" width="80" height="6" rx="3" fill="#c9d8e6"/><rect x="94" y="98" width="110" height="6" rx="3" fill="#e3edf5"/>
+<rect x="90" y="126" width="150" height="30" rx="10" fill="#fff"/><circle cx="106" cy="141" r="8" fill="#6366f1"/>
+<rect x="122" y="136" width="90" height="6" rx="3" fill="#c9d8e6"/>
+<path d="M262 96c0-9 11-12 14-4 3-8 14-5 14 4 0 9-14 18-14 18s-14-9-14-18z" fill="#fff"/></svg>`;
+
+registerApp({
+    id: 'wavy',
+    label: 'Wavy',
+    iconHtml: '<i class="fa-solid fa-wave-square"></i>',
+    iconClass: 'ps-ico-wavy',
+    fontClass: 'ps-wavy',
+    render(app) {
+        const st = wavyStore();
+        if (st.intro) return this.feed(app, { status: 'offline' });
+        app.innerHTML = `
+            <div class="wv-intro">
+                <div class="wv-intro-img">${WAVY_INTRO_SVG}</div>
+                <h2>ยินดีต้อนรับสู่ Wavy</h2>
+                <ul>
+                    <li><i class="fa-solid fa-newspaper"></i> ฟีดข่าวใหม่ตามเนื้อเรื่อง</li>
+                    <li><i class="fa-solid fa-rotate"></i> กดรีโหลดเมื่ออยากสร้างฟีด ไม่เรียกโมเดลเอง</li>
+                    <li><i class="fa-solid fa-heart"></i> กดถูกใจโพสต์ได้</li>
+                    <li><i class="fa-solid fa-key"></i> ใส่ API แยกได้ในปุ่มตั้งค่า</li>
+                </ul>
+                <button class="wv-start">เริ่มใช้งาน</button>
+            </div>`;
+        app.querySelector('.wv-start').onclick = () => {
+            st.intro = true;
+            save();
+            this.feed(app, { status: 'offline' });
+        };
+    },
+    // s = { status: 'offline' | 'loading' | 'ok' | 'error', posts?, msg? }
+    feed(app, s) {
+        app._wvS = s;
+        const loading = s.status === 'loading';
+        let body;
+        if (s.status === 'ok') {
+            body = `<div class="wv-feed">${s.posts.map((p) => `
+                <article class="wv-post" data-id="${p.id}">
+                    <div class="wv-who">
+                        <span class="wv-av" style="--h:${[...p.name].reduce((a, c) => a + c.charCodeAt(0), 0) % 360}">${esc([...p.name][0])}</span>
+                        <div><b>${esc(p.name)}</b><small>${esc(p.time)}</small></div>
+                    </div>
+                    <p>${esc(p.text)}</p>
+                    <div class="wv-stat"><span class="wv-lc">${p.likes + (p.liked ? 1 : 0)} ถูกใจ</span><span>${p.comments} ความคิดเห็น</span></div>
+                    <div class="wv-act">
+                        <button class="wv-like ${p.liked ? 'on' : ''}"><i class="fa-solid fa-heart"></i> ถูกใจ</button>
+                        <button class="wv-na"><i class="fa-regular fa-comment"></i> ความคิดเห็น</button>
+                        <button class="wv-na"><i class="fa-solid fa-share"></i> แชร์</button>
+                    </div>
+                </article>`).join('')}</div>`;
+        } else if (loading) {
+            body = `<div class="wv-feed">${'<div class="wv-post wv-skel"></div>'.repeat(3)}</div>`;
+        } else {
+            const offline = s.status === 'offline';
+            body = `<div class="wv-empty">
+                <i class="fa-solid ${offline ? 'fa-wifi' : 'fa-triangle-exclamation'}"></i>
+                <h3>${offline ? 'ไม่มีการเชื่อมต่อ' : 'โหลดฟีดไม่สำเร็จ'}</h3>
+                <p>${esc(offline ? 'ยังไม่ได้โหลดฟีด กดรีโหลดเพื่อสร้างฟีดข่าวใหม่' : s.msg || 'เกิดข้อผิดพลาด')}</p>
+                <button class="wv-start wv-retry">รีโหลด</button>
+            </div>`;
+        }
+        app.innerHTML = `
+            <div class="wv-head">
+                <span class="wv-logo">wavy</span>
+                <span class="wv-tools">
+                    <button class="wv-reload ${loading ? 'spin' : ''}" ${loading ? 'disabled' : ''} title="รีโหลด"><i class="fa-solid fa-rotate"></i></button>
+                    <button class="wv-gear" title="ตั้งค่า"><i class="fa-solid fa-gear"></i></button>
+                </span>
+            </div>${body}`;
+        app.querySelector('.wv-reload').onclick = () => this.reload(app);
+        app.querySelector('.wv-gear').onclick = () => this.settings(app);
+        const retry = app.querySelector('.wv-retry');
+        if (retry) retry.onclick = () => this.reload(app);
+        if (s.status === 'ok') {
+            app.querySelectorAll('.wv-post').forEach((el) => {
+                const p = s.posts.find((x) => String(x.id) === el.dataset.id);
+                el.querySelector('.wv-like').onclick = (e) => {
+                    p.liked = !p.liked; // ในเครื่องเท่านั้น ไม่เรียกโมเดล
+                    e.currentTarget.classList.toggle('on', p.liked);
+                    el.querySelector('.wv-lc').textContent = `${p.likes + (p.liked ? 1 : 0)} ถูกใจ`;
+                };
+                el.querySelectorAll('.wv-na').forEach((b) => (b.onclick = () => notify('info', 'ยังไม่เปิดให้ใช้งาน')));
+            });
+        }
+    },
+    async reload(app) {
+        if (app._wvS?.status === 'loading') return;
+        const tok = (app._wvTok = Date.now());
+        const alive = () => app._wvTok === tok && app.classList.contains('ps-wavy') && app.querySelector('.wv-head');
+        this.feed(app, { status: 'loading' });
+        try {
+            const raw = await wavyAsk(`Write 6 new posts for the feed.\n\n${wavyContext()}`);
+            const posts = wavyParse(raw);
+            if (alive()) this.feed(app, { status: 'ok', posts });
+        } catch (e) {
+            if (alive()) this.feed(app, { status: 'error', msg: e.message });
+        }
+    },
+    settings(app) {
+        const api = wavyStore().api;
+        const back = app._wvS?.status === 'loading' ? { status: 'offline' } : app._wvS || { status: 'offline' };
+        app._wvTok = null; // ยกเลิกผลโหลดที่ค้างอยู่
+        app.innerHTML = `
+            <div class="wv-head">
+                <button class="wv-gear wv-back"><i class="fa-solid fa-chevron-left"></i></button>
+                <span class="wv-title">ตั้งค่า</span><span style="width:30px"></span>
+            </div>
+            <div class="wv-set">
+                <div class="wv-mode"></div>
+                <label>Base URL<input class="wv-url" placeholder="https://api.openai.com/v1" value="${esc(api.url)}"></label>
+                <label>API Key<input class="wv-key" type="password" autocomplete="off" placeholder="เว้นว่าง = ใช้ API หลัก" value="${esc(api.key)}"></label>
+                <label>โมเดล<input class="wv-model" placeholder="เช่น gpt-4o-mini" value="${esc(api.model)}"></label>
+                <p class="wv-hint">รองรับ API แบบ OpenAI-compatible (/chat/completions) คีย์เก็บไว้ในการตั้งค่าส่วนขยายของเครื่องนี้</p>
+                <button class="wv-start wv-save">บันทึก</button>
+                <button class="wv-ghost wv-clear">ล้างค่า / กลับไปใช้ API หลัก</button>
+            </div>`;
+        const mode = () => {
+            const k = app.querySelector('.wv-key').value.trim();
+            app.querySelector('.wv-mode').textContent = k ? 'ตอนนี้ใช้: API แยก' : 'ตอนนี้ใช้: API หลัก';
+        };
+        mode();
+        app.querySelector('.wv-key').oninput = mode;
+        app.querySelector('.wv-back').onclick = () => this.feed(app, back);
+        app.querySelector('.wv-save').onclick = () => {
+            api.url = app.querySelector('.wv-url').value.trim() || 'https://api.openai.com/v1';
+            api.key = app.querySelector('.wv-key').value.trim();
+            api.model = app.querySelector('.wv-model').value.trim();
+            save();
+            notify('success', api.key ? 'บันทึกแล้ว ใช้ API แยก' : 'บันทึกแล้ว ใช้ API หลัก');
+            this.feed(app, back);
+        };
+        app.querySelector('.wv-clear').onclick = () => {
+            api.url = 'https://api.openai.com/v1';
+            api.key = '';
+            api.model = '';
+            save();
+            notify('success', 'ล้างแล้ว กลับไปใช้ API หลัก');
+            this.feed(app, back);
+        };
+    },
+});
+
 jQuery(() => {
     try {
         getSettings();
