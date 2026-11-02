@@ -1063,3 +1063,54 @@
 .wv-intro ul { list-style: none; padding: 0; margin: 0 0 18px; text-align: left; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
 .wv-intro li i { color: var(--wv-main); width: 20px; }
 .wv-start { width: 100%; border: 0; border-radius: 14px; padding: 12px; font: inherit; font-weight: 600; color: #fff; background: linear-gradient(90deg, var(--wv-main), #65a30d); cursor: pointer; }
+
+/* ================= แอป Wavy v2 (ธีมน้ำเงิน-เขียวมิ้นต์) — ต่อท้าย style.css (แทนบล็อก Wavy เดิม) ================= */
+.ps-wavy {
+    --wv-main: #3b82f6;
+    --wv-alt: #2dd4bf;
+    --wv-bg: #eef7fb;
+    --wv-card: #fff;
+    --wv-text: #0f2f3f;
+    --wv-sub: #6a8798;
+    --wv-line: #dce9f1;
+    background: var(--wv-bg);
+    color: var(--wv-text);
+    font-family: 'Kanit', sans-serif;
+}
+.ps-ico-wavy { background: linear-gradient(145deg, #3b82f6, #5eead4); color: #fff; }
+.wv-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 10px; background: var(--wv-card); position: sticky; top: 0; z-index: 2; box-shadow: 0 1px 0 rgba(15, 47, 63, 0.07); }
+.wv-logo { font-size: 26px; font-weight: 700; background: linear-gradient(90deg, var(--wv-main), var(--wv-alt)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.wv-title { font-weight: 600; }
+.wv-tools { display: flex; gap: 6px; }
+.wv-head button { width: 32px; height: 32px; border: 0; border-radius: 50%; background: #e4f1f7; color: var(--wv-main); cursor: pointer; display: grid; place-items: center; }
+.wv-head button:disabled { opacity: 0.6; }
+.wv-reload.spin i { animation: wvspin 0.9s linear infinite; }
+@keyframes wvspin { to { transform: rotate(360deg); } }
+.wv-feed { padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.wv-post { background: var(--wv-card); border-radius: 16px; padding: 12px; box-shadow: 0 1px 4px rgba(15, 47, 63, 0.08); }
+.wv-who { display: flex; align-items: center; gap: 10px; }
+.wv-who small { display: block; color: var(--wv-sub); font-size: 11px; }
+.wv-av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 600; background: hsl(var(--h), 55%, 48%); }
+.wv-post p { margin: 10px 0 8px; line-height: 1.55; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+.wv-stat { display: flex; justify-content: space-between; color: var(--wv-sub); font-size: 11px; padding-bottom: 6px; border-bottom: 1px solid var(--wv-line); }
+.wv-act { display: flex; justify-content: space-around; padding-top: 6px; }
+.wv-act button { background: none; border: 0; color: var(--wv-sub); font: inherit; font-size: 12px; padding: 6px 8px; border-radius: 10px; cursor: pointer; }
+.wv-act .wv-like.on { color: #f43f5e; }
+.wv-skel { height: 110px; background: linear-gradient(90deg, #dce9f1 25%, #f2f9fc 50%, #dce9f1 75%); background-size: 200% 100%; animation: wvsk 1.2s infinite; }
+@keyframes wvsk { to { background-position: -200% 0; } }
+.wv-empty { padding: 70px 28px; text-align: center; color: var(--wv-sub); }
+.wv-empty > i { font-size: 46px; color: #b7cddb; }
+.wv-empty h3 { margin: 14px 0 6px; color: var(--wv-text); }
+.wv-empty p { margin: 0 0 18px; font-size: 13px; line-height: 1.5; word-break: break-word; }
+.wv-intro { padding: 22px 18px; text-align: center; }
+.wv-intro-img svg { width: 100%; border-radius: 18px; box-shadow: 0 6px 18px rgba(59, 130, 246, 0.25); }
+.wv-intro h2 { margin: 16px 0 10px; font-size: 20px; }
+.wv-intro ul { list-style: none; padding: 0; margin: 0 0 18px; text-align: left; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.wv-intro li i { color: var(--wv-main); width: 20px; }
+.wv-start { width: 100%; border: 0; border-radius: 14px; padding: 12px; font: inherit; font-weight: 600; color: #fff; background: linear-gradient(90deg, var(--wv-main), var(--wv-alt)); cursor: pointer; }
+.wv-ghost { width: 100%; margin-top: 8px; border: 1px solid var(--wv-line); border-radius: 14px; padding: 10px; font: inherit; font-size: 13px; color: var(--wv-sub); background: transparent; cursor: pointer; }
+.wv-set { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.wv-set label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--wv-sub); }
+.wv-set input { border: 1px solid var(--wv-line); border-radius: 12px; padding: 10px; font: inherit; font-size: 14px; background: #fff; color: var(--wv-text); }
+.wv-mode { font-size: 13px; font-weight: 600; color: var(--wv-main); background: #e4f1f7; padding: 8px 12px; border-radius: 12px; }
+.wv-hint { margin: 0; font-size: 11px; color: var(--wv-sub); line-height: 1.5; }
